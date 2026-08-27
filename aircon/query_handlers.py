@@ -79,13 +79,22 @@ class QueryHandlers:
       return response
     try:
       if not update['data']:
-        logging.info('Unsupported update message = {}'.format(update['seq_no']))
+        # Empty payload = keep-alive/ack from the AC, not an error.
+        logging.debug('Empty update message (heartbeat) seq_no=%s', update['seq_no'])
         return response
       name = update['data']['name']
       # Fix A/C typos.
       if name == 'f_votage':
         name = 'f_voltage'
-      data_type = device.get_property_type(name)
+      try:
+        data_type = device.get_property_type(name)
+      except Exception:
+        # Property name not mapped anywhere in the code yet.
+        # Kept as its own log line (with a fixed, greppable prefix) to make
+        # it easy to discover new/undocumented properties, e.g.:
+        #   grep "UNMAPPED PROPERTY" homeassistant.log
+        logging.warning('UNMAPPED PROPERTY: %s', update['data'])
+        return response
       value = data_type(update['data']['value'])
       device.update_property(name, value)
     except Exception as ex:

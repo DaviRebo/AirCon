@@ -28,6 +28,10 @@ class _NotifyConfiguration:
 
 def _run_after_failure(retry_state):
   config = retry_state.kwargs['config']
+  logging.warning(
+      '[KeepAlive] Giving up on %s after %d attempts (%.1fs elapsed); marking unavailable.',
+      config.device.ip_address, retry_state.attempt_number,
+      retry_state.seconds_since_start or 0.0)
   config.device.available = False
   return 0
 
@@ -121,6 +125,8 @@ class Notifier:
       logging.error(f'Failed to connect to {config.device.ip_address}, maybe it is offline?')
       raise ConnectionError(
           f'Failed to connect to {config.device.ip_address}, maybe it is offline?')
+    if not config.device.available:
+      logging.info('[KeepAlive] %s is back online.', config.device.ip_address)
     config.last_timestamp = now
     config.device.available = True
     return queue_size
