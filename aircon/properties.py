@@ -12,6 +12,7 @@ class AirFlowState(enum.IntEnum):
 
 class FanSpeed(enum.IntEnum):
   AUTO = 0
+  QUIET = 1  # Velocita' speciale usata internamente quando t_fan_mute e' ON
   LOWER = 5
   LOW = 6
   MEDIUM = 7
@@ -20,11 +21,32 @@ class FanSpeed(enum.IntEnum):
 
 
 class SleepMode(enum.IntEnum):
-  STOP = 0
-  ONE = 1
-  TWO = 2
-  THREE = 3
-  FOUR = 4
+  OFF = 0
+  GENERIC = 1
+  ADULT = 2
+  TEEN = 3
+  CHILD = 4
+
+
+class SwingAngle(enum.IntEnum):
+  """Vertical swing, granular angle control (distinct from t_fan_power ON/OFF)."""
+  SWEEP = 0     # "Spazzare" nell'app
+  AUTO = 1
+  ANGLE_1 = 2
+  ANGLE_2 = 3
+  ANGLE_3 = 4
+  ANGLE_4 = 5
+  ANGLE_5 = 6
+  ANGLE_6 = 7
+
+
+class AirFlowDirection(enum.IntEnum):
+  """Flusso d'aria "allargato": direzione orizzontale del getto (t_swing_direction)."""
+  CENTER = 0
+  RIGHT = 1
+  LEFT_RIGHT = 2  # sinistra e destra, senza il centro
+  WIDE = 3        # "totale"
+  LEFT = 4
 
 
 class StateMachine(enum.IntEnum):
@@ -68,6 +90,11 @@ class DoubleFrequency(enum.Enum):
 
 
 class Economy(enum.Enum):
+  OFF = 0
+  ON = 1
+
+
+class AiMode(enum.Enum):
   OFF = 0
   ON = 1
 
@@ -273,7 +300,7 @@ class AcProperties(Properties):
                                           }
                                       })  # DoubleFrequency
   t_setmulti_value: int = field(default=None, metadata={'base_type': 'integer', 'read_only': False})
-  t_sleep: SleepMode = field(default=SleepMode.STOP,
+  t_sleep: SleepMode = field(default=SleepMode.OFF,
                              metadata={
                                  'base_type': 'integer',
                                  'read_only': False,
@@ -282,10 +309,32 @@ class AcProperties(Properties):
                                      'decoder': lambda x: SleepMode[x]
                                  }
                              })  # SleepMode
+  t_swing_angle: SwingAngle = field(default=SwingAngle.AUTO,
+                                    metadata={
+                                        'base_type': 'integer',
+                                        'read_only': False,
+                                        'dataclasses_json': {
+                                            'encoder': lambda x: x.name,
+                                            'decoder': lambda x: SwingAngle[x]
+                                        }
+                                    })  # Vertical swing angle (granular)
+  t_swing_direction: AirFlowDirection = field(default=AirFlowDirection.CENTER,
+                                              metadata={
+                                                  'base_type': 'integer',
+                                                  'read_only': False,
+                                                  'dataclasses_json': {
+                                                      'encoder': lambda x: x.name,
+                                                      'decoder': lambda x: AirFlowDirection[x]
+                                                  }
+                                              })  # Flusso d'aria allargato / direzione
   t_temp: int = field(default=81, metadata={
       'base_type': 'integer',
       'read_only': False
   })  # CurrentTemperature
+  t_temp_compensate: int = field(default=0, metadata={
+      'base_type': 'integer',
+      'read_only': False
+  })  # AI mode: compensazione temperatura, range -3..+3
   t_temptype: TemperatureUnit = field(default=TemperatureUnit.FAHRENHEIT,
                                       metadata={
                                           'base_type': 'boolean',
@@ -313,6 +362,15 @@ class AcProperties(Properties):
                                                 'decoder': lambda x: FastColdHeat[x]
                                             }
                                         })  # FastCoolHeatStatus
+  t_tms: AiMode = field(default=AiMode.OFF,
+                        metadata={
+                            'base_type': 'boolean',
+                            'read_only': False,
+                            'dataclasses_json': {
+                                'encoder': lambda x: x.name,
+                                'decoder': lambda x: AiMode[x]
+                            }
+                        })  # Modalita' AI
   t_work_mode: AcWorkMode = field(default=AcWorkMode.AUTO,
                                   metadata={
                                       'base_type': 'integer',

@@ -14,9 +14,10 @@ from Crypto.Cipher import AES
 from . import control_value
 from .config import Config, Encryption
 from .error import Error
-from .properties import (AcProperties, AirFlow, AirFlowState, Economy, FanSpeed, FastColdHeat,
-                         FglProperties, FglBProperties, HumidifierProperties, Properties, Power,
-                         AcWorkMode, Quiet, TemperatureUnit, SleepMode)
+from .properties import (AcProperties, AiMode, AirFlow, AirFlowDirection, AirFlowState, Economy,
+                         FanSpeed, FastColdHeat, FglProperties, FglBProperties,
+                         HumidifierProperties, Properties, Power, AcWorkMode, Quiet,
+                         TemperatureUnit, SleepMode, SwingAngle)
 
 
 @dataclass(order=True)
@@ -165,7 +166,9 @@ class Device(object):
       data_value = data_type(value)
 
     # If device has set t_control_value it is being controlled by this field.
-    if name != 't_control_value' and self.get_property('t_control_value') and name != 't_sleep':
+    if (name != 't_control_value' and self.get_property('t_control_value') and
+        name != 't_sleep' and name != 't_swing_angle' and name != 't_swing_direction' and
+        name != 't_tms' and name != 't_temp_compensate'):
       self._convert_to_control_value(name, data_value)
       return
 
@@ -243,10 +246,16 @@ class AcDevice(Device):
         'power': 't_power',
         'swing_mode': 't_fan_power',
         'swing_horizontal_mode': 't_fan_leftright',
+        'swing_vertical_angle': 't_swing_angle',
+        'air_flow_direction': 't_swing_direction',
+        'ai_mode': 't_tms',
+        'ai_temp_compensate': 't_temp_compensate',
         'temp': 't_temp'
     }
     self.work_modes = ['off', 'fan_only', 'heat', 'cool', 'dry', 'auto']
-    self.fan_modes = ['auto', 'lower', 'low', 'medium', 'high', 'higher']
+    self.fan_modes = ['auto', 'quiet', 'lower', 'low', 'medium', 'high', 'higher']
+    self.swing_vertical_angle_modes = [mode.name.lower() for mode in SwingAngle]
+    self.air_flow_direction_modes = [mode.name.lower() for mode in AirFlowDirection]
 
   # @override to add special support for t_power.
   def update_property(self, name: str, value) -> None:
@@ -278,7 +287,7 @@ class AcDevice(Device):
     if name == 't_temp_heatcold' and value == 'ON':
       super().queue_command('t_fan_speed', 'AUTO')
       super().queue_command('t_fan_mute', 'OFF')
-      super().queue_command('t_sleep', 'STOP')
+      super().queue_command('t_sleep', 'OFF')
       super().queue_command('t_temp_eight', 'OFF')
 
   def get_env_temp(self) -> int:
@@ -317,10 +326,12 @@ class AcDevice(Device):
       return self.get_property('t_temp')
 
   def set_sleep(self, setting: SleepMode) -> None:
-    self.queue_command('t_control_value', setting)
+    # t_sleep is independent of t_control_value (see the exclusion in
+    # Device.queue_command), so no need to branch like the other setters.
+    self.queue_command('t_sleep', setting)
 
   def get_sleep(self) -> SleepMode:
-    self.get_property('t_sleep')
+    return self.get_property('t_sleep')
 
   def set_work_mode(self, setting: AcWorkMode) -> None:
     control = self.get_property('t_control_value')
