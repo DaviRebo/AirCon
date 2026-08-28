@@ -11,6 +11,7 @@ import logging
 import logging.handlers
 import os
 import paho.mqtt.client as mqtt
+import random
 from retry import retry
 import signal
 import socket
@@ -36,8 +37,18 @@ from .query_handlers import QueryHandlers
 
 
 async def query_status_device(device: Device):
-  _STATUS_UPDATE_INTERVAL = 600.0
+  # E' solo un sync di sicurezza: gli aggiornamenti reali arrivano gia' via
+  # push non appena cambiano. Un intervallo lungo riduce quanto spesso il
+  # modulo WiFi dell'AC resta occupato a rispondere una proprieta' alla
+  # volta (fino a decine di richieste sequenziali).
+  _STATUS_UPDATE_INTERVAL = 1800.0
   _WAIT_FOR_EMPTY_QUEUE = 10.0
+  # Sfalsa il primo giro per dispositivo, cosi' con piu' AC configurati i
+  # refresh completi non cadono tutti nello stesso istante: altrimenti,
+  # partendo insieme all'avvio dell'add-on, restano sincronizzati per
+  # sempre e aumentano il rischio che il keep-alive del Notifier trovi la
+  # connessione occupata proprio mentre l'AC sta rispondendo al refresh.
+  await asyncio.sleep(random.uniform(0, _STATUS_UPDATE_INTERVAL))
   while True:
     # In case the AC is stuck, and not fetching commands, avoid flooding
     # the queue with status updates.

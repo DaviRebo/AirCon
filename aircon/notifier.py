@@ -122,7 +122,12 @@ class Notifier:
           raise ConnectionError(f'Sending local_reg failed: {resp.status}, {resp_data}')
     except (aiohttp.client_exceptions.ClientConnectorError,
             aiohttp.client_exceptions.ClientConnectionError) as e:
-      logging.error(f'Failed to connect to {config.device.ip_address}, maybe it is offline?')
+      # Blip transitorio, quasi sempre dovuto al modulo WiFi dell'AC che
+      # gestisce una sola connessione alla volta ed era gia' occupato nel
+      # proprio giro di polling. Il retry (vedi decoratore sopra) di norma
+      # risolve al tentativo successivo: non e' un errore reale finche' non
+      # si esauriscono i tentativi (vedi _run_after_failure).
+      logging.debug(f'[KeepAlive] Transient connection error to {config.device.ip_address}: {e!r}')
       raise ConnectionError(
           f'Failed to connect to {config.device.ip_address}, maybe it is offline?')
     if not config.device.available:
